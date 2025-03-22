@@ -1,81 +1,81 @@
-# 多阶段构建优化版Dockerfile 
-# 改进点：依赖管理/缓存优化/多架构支持/安全加固 
- 
-# ----------------- 后端构建阶段 ----------------- 
-FROM --platform=$BUILDPLATFORM golang:1.21-alpine AS backend 
- 
-# 基础配置 
-WORKDIR /backend 
-COPY go.mod  go.sum  ./
-RUN --mount=type=cache,target=/go/pkg/mod \
-    go mod download -x 
- 
-# 设置编译环境 
-ARG TARGETARCH TARGETOS 
-ENV GOOS=$TARGETOS GOARCH=$TARGETARCH \
-    CGO_ENABLED=1 GO111MODULE=on \
-    GOPROXY=https://goproxy.cn,direct  
- 
-# 安装编译工具链（使用国内镜像加速）
-RUN apk add --no-cache --virtual .build-deps \
-    gcc musl-dev g++ make linux-headers \
-    && case "$TARGETARCH" in \
-        arm64) \
-        wget -q -O /tmp/cross.tgz  https://mirrors.ustc.edu.cn/musl.cc/aarch64-linux-musl-cross.tgz  \
-        && tar -xf /tmp/cross.tgz  -C /usr/local \
-        && ln -s /usr/local/aarch64-linux-musl-cross/bin/aarch64-linux-musl-* /usr/bin/ \
-        ;; \
-    esac 
- 
-# 源码构建 
+# Author: ProgramZmh
+# License: Apache-2.0
+# Description: Dockerfile for chatnio
+
+FROM --platform=$BUILDPLATFORM golang:1.20-alpine AS backend
+
+WORKDIR /backend
 COPY . .
-RUN --mount=type=cache,target=/go/pkg/mod \
-    --mount=type=cache,target=/root/.cache/go-build \
-    if [ "$TARGETARCH" = "arm64" ]; then \
-        CC=aarch64-linux-musl-gcc \
-        go build -trimpath -ldflags="-s -w -extldflags=-static" -o chat . ; \
+
+# Set go proxy to https://goproxy.cn (open for vps in China Mainland)
+# RUN go env -w GOPROXY=https://goproxy.cn,direct
+ARG TARGETARCH
+ARG TARGETOS
+ENV GOOS=$TARGETOS GOARCH=$TARGETARCH GO111MODULE=on CGO_ENABLED=1
+
+# Install build dependencies and cross-compilation toolchain
+RUN apk add --no-cache \
+    gcc \
+    musl-dev \
+    g++ \
+    make \
+    linux-headers \
+    wget \
+    tar \
+    && if [ "$TARGETARCH" = "arm64" ]; then \
+    wget -q -O /tmp/cross.tgz https://musl.cc/aarch64-linux-musl-cross.tgz && \
+    tar -xf /tmp/cross.tgz -C /usr/local && \
+    rm /tmp/cross.tgz; \
+    fi
+
+# Build backend
+RUN if [ "$TARGETARCH" = "arm64" ]; then \
+    CC=/usr/local/aarch64-linux-musl-cross/bin/aarch64-linux-musl-gcc \
+    CGO_ENABLED=1 \
+    GOOS=linux \
+    GOARCH=arm64 \
+    go build -o chat -a -ldflags="-extldflags=-static" .; \
     else \
-        go build -trimpath -ldflags="-s -w" -o chat . ; \
-    fi 
- 
-# ----------------- 前端构建阶段 ----------------- 
-FROM node:18-alpine AS frontend 
- 
-WORKDIR /app 
-COPY app/package.json  app/pnpm-lock.yaml  ./
- 
-# 依赖安装（使用国内镜像）
-RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
-    npm config set registry https://registry.npmmirror.com  \
-    && npm install -g pnpm \
-    && pnpm install --frozen-lockfile 
- 
-# 构建生产版本 
-COPY app .
-RUN pnpm build && \
-    find dist -type f -exec gzip -k9 {} \; # 预压缩静态资源 
- 
-# ----------------- 运行时镜像 ----------------- 
-FROM alpine:3.19 
- 
-# 系统级配置 
-RUN echo "Asia/Shanghai" > /etc/timezone \
-    && apk upgrade --no-cache \
-    && apk add --no-cache ca-certificates tzdata \
-    && update-ca-certificates \
-    && adduser -D -u 1000 appuser 
- 
-# 文件复制 
-COPY --from=backend --chown=appuser /backend/chat /chat 
-COPY --from=backend --chown=appuser /backend/config.example.yaml  /defaults/
-COPY --from=frontend --chown=appuser /app/dist /app/dist 
- 
-# 运行时配置 
-USER appuser 
+    go install && \
+    go build .; \
+    fi
+
+FROM node:18 AS frontend
+
+WORKDIR /app
+COPY ./app .
+
+RUN npm install -g pnpm && \
+    pnpm install && \
+    pnpm run build && \
+    rm -rf node_modules src
+
+
+FROM alpine
+
+# Install dependencies
+RUN apk upgrade --no-cache && \
+    apk add --no-cache wget ca-certificates tzdata && \
+    update-ca-certificates 2>/dev/null || true
+
+# Set timezone
+RUN echo "Asia/Shanghai" > /etc/timezone && \
+    ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
+
+WORKDIR /
+
+# Copy dist
+COPY --from=backend /backend/chat /chat
+COPY --from=backend /backend/config.example.yaml /config.example.yaml
+COPY --from=backend /backend/utils/templates /utils/templates
+COPY --from=backend /backend/addition/article/template.docx /addition/article/template.docx
+COPY --from=frontend /app/dist /app/dist
+
+# Volumes
 VOLUME ["/config", "/logs", "/storage"]
-EXPOSE 8094 
-HEALTHCHECK --interval=30s --timeout=3s \
-    CMD wget --spider http://localhost:8094/api/health || exit 1 
- 
-ENTRYPOINT ["/chat", "--config", "/config/config.yaml"] 
-CMD ["--log-level", "info"]
+
+# Expose port
+EXPOSE 8094
+
+# Run application
+CMD ["./chat"]
