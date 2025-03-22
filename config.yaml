@@ -1,16 +1,16 @@
 mysql:
   db: chatnio
-  host: localhost
-  password: chatnio123456
+  host: po0go0g08owkwogw4g04csg0
+  password: bEYwHbeNyCf81ZsJcPk7vgZCRGdqNv52fYfEhX4QymkrOABDq4SLCi3iAP7zlK18
   port: 3306
   user: root
   tls: false
 
 redis:
-  host: localhost
+  host: q48kcc488ckskggw8g0gscsk
   port: 6379
   db: 0
-  password: ""
+  password: "MZFBXtmYkTPyuIXMZukGKgS1aFVx6Biz5qpNimR5jJ7MBoPtGhxiHsPJ6DWCvypV"
 
 
 secret: secret
