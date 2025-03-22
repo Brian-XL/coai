@@ -10,7 +10,8 @@ redis:
   host: q48kcc488ckskggw8g0gscsk
   port: 6379
   db: 0
-  password: "MZFBXtmYkTPyuIXMZukGKgS1aFVx6Biz5qpNimR5jJ7MBoPtGhxiHsPJ6DWCvypV"
+  user: root
+  password: MZFBXtmYkTPyuIXMZukGKgS1aFVx6Biz5qpNimR5jJ7MBoPtGhxiHsPJ6DWCvypV
 
 
 secret: secret
