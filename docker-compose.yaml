@@ -19,3 +19,6 @@ services:
       - ./config:/config 
       - ./logs:/logs 
       - ./storage:/storage 
+networks:
+  chatnio:
+    driver: bridge
