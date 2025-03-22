@@ -13,6 +13,8 @@ services:
       MYSQL_PASSWORD: bEYwHbeNyCf81ZsJcPk7vgZCRGdqNv52fYfEhX4QymkrOABDq4SLCi3iAP7zlK18 
       REDIS_HOST: "q48kcc488ckskggw8g0gscsk"
       REDIS_PORT: 6379 
+      REDIS_USER: root
+      REDIS_PASSWORD: MZFBXtmYkTPyuIXMZukGKgS1aFVx6Biz5qpNimR5jJ7MBoPtGhxiHsPJ6DWCvypV
       SECRET: "secret"
       SERVE_STATIC: "true"
     volumes:
